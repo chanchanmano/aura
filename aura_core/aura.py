@@ -1,10 +1,18 @@
+from pydantic import Json
+from aura_core.config.policy_schema import PolicyConfig
+from aura_core.evaluate.policy import Policy
+from aura_core.engine.policy_manager import PolicyManager
 from aura_core.logstore import store
 
 
 class Aura:
 
-    def __init__(self, store: store):
+    def __init__(self, store: store, policy_config:PolicyConfig):
         self.store = store
+        self.policy_manager = PolicyManager(Policy(policy_config))
+    
+    def process_capture(self, data_dump:Json):
+        pass
 
     def log(self, log_entry, labels: dict = {}, *args, **kwargs):
         return self.store.store_log(log_entry, labels, *args, **kwargs)
