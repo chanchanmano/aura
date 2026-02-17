@@ -1,4 +1,5 @@
 from aura_core.evaluate.policy import Policy
+from aura_core.evaluate.rule import Rule
 
 
 class PolicyManager:
@@ -7,52 +8,62 @@ class PolicyManager:
         self.policy = policy
         self.active_ruleset = "general"
 
-    def evaluate(self, event: dict):
-        """
-        Evaluate rules in the active ruleset.
-        Return triggered rule (after override resolution).
-        """
+    def evaluate(self, event: dict) -> tuple[list[Rule], str | None]:
 
-        rules = self.policy.get_rules_for_ruleset(
-            self.active_ruleset
-        )
-
-        triggered = []
-
-        for rule in rules:
-            if rule.evaluate(event):
-                triggered.append(rule)
+        rules = self.policy.get_rules_for_ruleset(self.active_ruleset)
+        triggered = [rule for rule in rules if rule.evaluate(event)]
 
         if not triggered:
-            return None
+            return [], None
 
-        return self._resolve_override(triggered)
+        winning_ruleset = self._resolve_override(triggered)
+        return triggered, winning_ruleset
 
-    def _resolve_override(self, rules: list):
+    def get_relevant_logs(self, rules: list[Rule]) -> list[str]:
+        """
+        Returns the logs that belongs to rules passed as parameters
+        """
+
+        logs = set()
+        for rule in rules:
+            [logs.add(log) for log in rule.log_fields]
+
+        return logs
+
+    def get_active_log_fields(self) -> set[str]:
+        rules = self.policy.get_rules_for_ruleset(self.active_ruleset)
+
+        fields = set()
+        for rule in rules:
+            fields.update(rule.log_fields)
+
+        return fields
+
+    def _resolve_override(self, rules: list[Rule]) -> str | None:
         """
         Override strategy:
         If multiple rules fire,
-        prefer rule whose target ruleset has highest priority.
+        return the target ruleset with highest priority.
         """
 
-        if len(rules) == 1:
-            return rules[0]
+        winning_ruleset = None
+        max_priority = -1
 
-        def priority(rule):
+        for rule in rules:
             target = getattr(rule.action, "target", None)
-            if target:
-                return self.policy.get_priority(target)
-            return 0
+            if not target:
+                continue
 
-        return max(rules, key=priority)
+            priority = self.policy.get_priority(target)
+            if priority > max_priority:
+                max_priority = priority
+                winning_ruleset = target
 
-    def apply_action(self, rule):
-        """
-        Executes rule action (e.g. switch_ruleset).
-        """
+        return winning_ruleset
 
-        if rule.action.type == "switch_ruleset":
-            self._switch_ruleset(rule.action.target)
+    def apply_action(self, target_ruleset: str | None):
+        if target_ruleset:
+            self._switch_ruleset(target_ruleset)
 
     def _switch_ruleset(self, target: str):
         if target not in self.policy.ruleset_priorities:

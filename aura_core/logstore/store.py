@@ -45,10 +45,10 @@ class LokiLogStore:
             ]
         }
 
-        print("PAYLOAD:", json.dumps(payload, indent=2))
+        # print("PAYLOAD:", json.dumps(payload, indent=2))
         resp = requests.post(f"{self.host_url}/loki/api/v1/push", json=payload)
-        print("STATUS:", resp.status_code)
-        print("BODY:", resp.text)
+        # print("STATUS:", resp.status_code)
+        # print("BODY:", resp.text)
         if resp.status_code != 204:
             print(f"Failed to push log to Loki: {resp.text}")
         

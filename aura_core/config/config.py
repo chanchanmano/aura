@@ -1,6 +1,5 @@
 import yaml
 from enum import Enum
-from pydantic import BaseModel
 
 from aura_core.config.policy_schema import PolicyConfig
 
