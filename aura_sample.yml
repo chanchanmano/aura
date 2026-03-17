@@ -1,0 +1,81 @@
+policy:
+  name: agent_runtime_policy
+  version: 1.0
+  author: aura_system
+  collision_resolution: override   # Only highest-priority ruleset remains active
+
+rulesets:
+  - name: general
+    priority: 1
+
+  - name: minimal_logging
+    priority: 2
+
+  - name: maximal_logging
+    priority: 3
+
+rules:
+
+  # ─────────────────────────────────────────────
+  # Rule 1: Escalate to maximal_logging
+  # ─────────────────────────────────────────────
+  - ruleset: general
+    tag: risk_check
+    name: high_risk_tool_call
+    action:
+      type: switch_ruleset
+      target: maximal_logging
+    log_fields:
+      - controller.latency.time
+      - controller.sensitivity
+      - model.temperature
+    evaluation_on: AND
+    conditions:
+      - field: risk_score
+        comparator: ">"
+        value: 0.7
+      - field: tool_used
+        comparator: "=="
+        value: external_api
+
+  # ─────────────────────────────────────────────
+  # Rule 2: De-escalate to minimal_logging
+  # ─────────────────────────────────────────────
+  - ruleset: maximal_logging
+    tag: stabilization
+    name: latency_stabilized
+    action:
+      type: switch_ruleset
+      target: minimal_logging
+    log_fields:
+      - controller.latency.time
+      - agent_latency
+    evaluation_on: AND
+    conditions:
+      - field: agent_latency
+        comparator: "<="
+        value: 100
+      - field: risk_score
+        comparator: "<="
+        value: 0.7
+
+  # ─────────────────────────────────────────────
+  # Rule 3: Return to general baseline
+  # ─────────────────────────────────────────────
+  - ruleset: minimal_logging
+    tag: reset_state
+    name: normal_operation
+    action:
+      type: switch_ruleset
+      target: general
+    log_fields:
+      - event_type
+      - risk_score
+    evaluation_on: AND
+    conditions:
+      - field: event_type
+        comparator: "=="
+        value: heartbeat
+      - field: risk_score
+        comparator: "<"
+        value: 0.5
